@@ -4,9 +4,10 @@ import { ensureDirExists, paths } from "../config/paths";
 import {
   createDefaultProjectConfig,
   type ProjectConfig,
+  type ProviderType,
 } from "../config/schema";
 import { discoverPages, isMintlifySite } from "../discovery";
-import { ensureOpenAIApiKey } from "./prompt";
+import { ensureProviderKeys } from "./prompt";
 import { seedDocs } from "./seed";
 import { startServer, waitForServer } from "./start";
 import { stopAllServers } from "./stop";
@@ -30,9 +31,9 @@ export interface SetupOptions {
   host?: string;
   port?: number;
   // Embedded options (advanced)
-  llmProvider?: "openai" | "ollama";
+  llmProvider?: ProviderType;
   llmModel?: string;
-  embeddingProvider?: "openai" | "ollama";
+  embeddingProvider?: ProviderType;
   embeddingModel?: string;
   // General
   verbose?: boolean;
@@ -87,20 +88,20 @@ export async function setupCommand(options: SetupOptions): Promise<void> {
     process.exit(1);
   }
 
-  // Validate environment for RAG backends (embedded & agno both need OpenAI)
+  // Validate environment for RAG backends
   if (backend === "embedded" || backend === "agno") {
     // Local mode (Ollama) is not yet implemented for embedded
     if (backend === "embedded" && local) {
       console.error("❌ Local mode (Ollama) is not yet implemented.");
-      console.error("   Please use OpenAI mode with OPENAI_API_KEY for now.");
+      console.error("   Please use OpenAI or Google mode for now.");
       process.exit(1);
     }
 
-    // Ensure API key is available (prompt if interactive)
-    const hasApiKey = await ensureOpenAIApiKey();
-    if (!hasApiKey) {
-      process.exit(1);
-    }
+    const ok = await ensureProviderKeys({
+      llm: llmProvider,
+      embedding: embeddingProvider,
+    });
+    if (!ok) process.exit(1);
   }
 
   // ==========================================================================
@@ -221,9 +222,11 @@ async function setupEmbeddedBackend(
     `\n📚 Seeding ${pages.length} pages to embedded knowledge base...`,
   );
 
+  const providerLabel =
+    config.embedded?.llm_provider === "google" ? "Google" : "OpenAI";
   const modeLabel = config.embedded?.local
     ? "local (Ollama)"
-    : "cloud (OpenAI)";
+    : `cloud (${providerLabel})`;
   console.log(`   Mode: ${modeLabel}`);
 
   // Dynamic import to avoid loading embedded module if not needed
