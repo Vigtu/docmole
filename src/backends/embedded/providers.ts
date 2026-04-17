@@ -2,8 +2,9 @@
 // PROVIDER FACTORIES
 // =============================================================================
 
+import { google } from "@ai-sdk/google";
 import { openai } from "@ai-sdk/openai";
-import type { LanguageModel } from "ai";
+import { type EmbeddingModel, embed, embedMany, type LanguageModel } from "ai";
 import type { EmbeddingConfig, LLMConfig } from "./config";
 
 // =============================================================================
@@ -18,11 +19,14 @@ export function createLLM(config: LLMConfig): LanguageModel {
     case "openai":
       return openai(config.model);
 
+    case "google":
+      return google(config.model);
+
     case "ollama":
       // TODO: Ollama LLM support planned for Phase 3
       // Will use @ai-sdk/openai-compatible or custom provider
       throw new Error(
-        "Ollama LLM is not yet implemented. Use OpenAI for now (requires OPENAI_API_KEY).",
+        "Ollama LLM is not yet implemented. Use OpenAI or Google for now.",
       );
 
     default:
@@ -167,6 +171,43 @@ export class OllamaEmbedder implements Embedder {
   }
 }
 
+// Known Google embedding model dimensions
+const GOOGLE_EMBEDDING_DIMENSIONS: Record<string, number> = {
+  "gemini-embedding-001": 3072,
+  "text-embedding-004": 768,
+  "embedding-001": 768,
+};
+
+/**
+ * Google Gemini Embedder using the @ai-sdk/google SDK.
+ * Auto-chunks large batches via the SDK's embedMany helper.
+ */
+export class GoogleEmbedder implements Embedder {
+  private embeddingModel: EmbeddingModel;
+  readonly dimensions: number;
+
+  constructor(model = "gemini-embedding-001", dimensions?: number) {
+    this.embeddingModel = google.textEmbeddingModel(model);
+    this.dimensions = dimensions ?? GOOGLE_EMBEDDING_DIMENSIONS[model] ?? 768;
+  }
+
+  async embed(text: string): Promise<number[]> {
+    const { embedding } = await embed({
+      model: this.embeddingModel,
+      value: text,
+    });
+    return embedding;
+  }
+
+  async embedBatch(texts: string[]): Promise<number[][]> {
+    const { embeddings } = await embedMany({
+      model: this.embeddingModel,
+      values: texts,
+    });
+    return embeddings;
+  }
+}
+
 /**
  * Create embedder based on config
  */
@@ -175,11 +216,14 @@ export function createEmbedder(config: EmbeddingConfig): Embedder {
     case "openai":
       return new OpenAIEmbedder(config.model);
 
+    case "google":
+      return new GoogleEmbedder(config.model);
+
     case "ollama":
       // TODO: Ollama embeddings support planned for Phase 3
       // The OllamaEmbedder class exists but needs testing
       throw new Error(
-        "Ollama embeddings are not yet implemented. Use OpenAI for now (requires OPENAI_API_KEY).",
+        "Ollama embeddings are not yet implemented. Use OpenAI or Google for now.",
       );
 
     default:
@@ -205,6 +249,17 @@ export function validateProviderConfig(config: {
     if (!process.env.OPENAI_API_KEY) {
       throw new Error(
         "OPENAI_API_KEY environment variable is required for OpenAI provider",
+      );
+    }
+  }
+
+  if (
+    config.llm.provider === "google" ||
+    config.embedding.provider === "google"
+  ) {
+    if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+      throw new Error(
+        "GOOGLE_GENERATIVE_AI_API_KEY environment variable is required for Google provider",
       );
     }
   }

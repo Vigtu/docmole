@@ -15,6 +15,12 @@ export const BACKEND_TYPES = ["mintlify", "embedded", "agno"] as const;
 /** Backend type union - derived from BACKEND_TYPES */
 export type BackendType = (typeof BACKEND_TYPES)[number];
 
+/** All supported LLM/embedding providers */
+export const PROVIDER_TYPES = ["openai", "ollama", "google"] as const;
+
+/** Provider type union - derived from PROVIDER_TYPES */
+export type ProviderType = (typeof PROVIDER_TYPES)[number];
+
 // =============================================================================
 // TYPE DEFINITIONS
 // =============================================================================
@@ -51,11 +57,11 @@ export interface EmbeddedProjectConfig {
   /** Use local providers (Ollama) instead of cloud (OpenAI) */
   local: boolean;
   /** LLM provider */
-  llm_provider: "openai" | "ollama";
+  llm_provider: ProviderType;
   /** LLM model */
   llm_model: string;
   /** Embedding provider */
-  embedding_provider: "openai" | "ollama";
+  embedding_provider: ProviderType;
   /** Embedding model */
   embedding_model: string;
   /** Ollama base URL (for local mode) */
@@ -133,9 +139,9 @@ export interface CreateProjectOptions {
   agnoPort?: number;
   // Embedded options
   local?: boolean;
-  llmProvider?: "openai" | "ollama";
+  llmProvider?: ProviderType;
   llmModel?: string;
-  embeddingProvider?: "openai" | "ollama";
+  embeddingProvider?: ProviderType;
   embeddingModel?: string;
   ollamaBaseUrl?: string;
 }
