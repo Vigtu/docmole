@@ -1,4 +1,5 @@
 import * as readline from "node:readline";
+import type { ProviderType } from "../config/schema";
 
 // =============================================================================
 // INTERACTIVE PROMPTS
@@ -71,5 +72,63 @@ export async function ensureOpenAIApiKey(): Promise<boolean> {
     `      export OPENAI_API_KEY=${apiKey.slice(0, 7)}...${apiKey.slice(-4)}\n`,
   );
 
+  return true;
+}
+
+/**
+ * Ensure GOOGLE_GENERATIVE_AI_API_KEY is available, prompting if needed
+ * Returns true if key is available, false if user cancelled
+ */
+export async function ensureGoogleApiKey(): Promise<boolean> {
+  if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+    return true;
+  }
+
+  if (!isInteractive()) {
+    console.error(
+      "❌ GOOGLE_GENERATIVE_AI_API_KEY environment variable is required.",
+    );
+    console.error("   Export it: export GOOGLE_GENERATIVE_AI_API_KEY=AI...");
+    return false;
+  }
+
+  console.log("\n🔑 Google AI API key is required for Gemini mode.\n");
+  console.log("   You can get one at: https://aistudio.google.com/apikey\n");
+
+  const apiKey = await prompt("   Enter your Google AI API key: ");
+
+  if (!apiKey) {
+    console.error("\n❌ No API key provided.");
+    return false;
+  }
+
+  process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey;
+
+  console.log("\n   ✓ API key set for this session.");
+  console.log("   💡 Tip: Add to your shell profile for persistence:");
+  console.log(
+    `      export GOOGLE_GENERATIVE_AI_API_KEY=${apiKey.slice(0, 7)}...${apiKey.slice(-4)}\n`,
+  );
+
+  return true;
+}
+
+/**
+ * Ensure API keys are available for the given providers.
+ * Returns false if any required key is missing and could not be provided.
+ */
+export async function ensureProviderKeys(providers: {
+  llm?: ProviderType;
+  embedding?: ProviderType;
+}): Promise<boolean> {
+  const llm = providers.llm ?? "openai";
+  const embedding = providers.embedding ?? "openai";
+
+  if (llm === "openai" || embedding === "openai") {
+    if (!(await ensureOpenAIApiKey())) return false;
+  }
+  if (llm === "google" || embedding === "google") {
+    if (!(await ensureGoogleApiKey())) return false;
+  }
   return true;
 }

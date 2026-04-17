@@ -2,11 +2,13 @@
 // EMBEDDED BACKEND CONFIGURATION
 // =============================================================================
 
+import type { ProviderType } from "../../config/schema";
+
 /**
  * LLM provider configuration
  */
 export interface LLMConfig {
-  provider: "openai" | "ollama";
+  provider: ProviderType;
   model: string;
   baseUrl?: string;
 }
@@ -15,7 +17,7 @@ export interface LLMConfig {
  * Embedding provider configuration
  */
 export interface EmbeddingConfig {
-  provider: "openai" | "ollama";
+  provider: ProviderType;
   model: string;
   baseUrl?: string;
 }
@@ -121,9 +123,9 @@ export function createLocalConfig(projectPath: string): EmbeddedConfig {
 export interface ConfigOptions {
   projectPath: string;
   local?: boolean;
-  llmProvider?: "openai" | "ollama";
+  llmProvider?: ProviderType;
   llmModel?: string;
-  embeddingProvider?: "openai" | "ollama";
+  embeddingProvider?: ProviderType;
   embeddingModel?: string;
   ollamaBaseUrl?: string;
 }

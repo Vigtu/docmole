@@ -45,6 +45,7 @@
     "bun": ">=1.0.0"
   },
   "dependencies": {
+    "@ai-sdk/google": "^3.0.43",
     "@ai-sdk/openai": "^3.0.12",
     "@lancedb/lancedb": "^0.23.0",
     "@modelcontextprotocol/sdk": "^1.0.0",

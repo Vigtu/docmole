@@ -4,16 +4,13 @@ import {
   isAgentRunning,
   isServerRunning,
 } from "../backends/agno";
-import {
-  type BackendType,
-  getBackend,
-  loadBackend,
-} from "../backends/registry";
+import { getBackend } from "../backends/registry";
 import type { Backend } from "../backends/types";
-import { loadProjectConfig } from "../config/loader";
-import { paths } from "../config/paths";
+import type { ProjectConfig } from "../config/schema";
 import { startMcpServer } from "../server";
-import { ensureOpenAIApiKey } from "./prompt";
+import { buildBackendOptions } from "./backend-options";
+import { requireBackend, requireProjectConfig } from "./guards";
+import { ensureProviderKeys } from "./prompt";
 import { startServer, stopServer, waitForServer } from "./start";
 
 // =============================================================================
@@ -30,53 +27,23 @@ export interface ServeOptions {
 export async function serveCommand(options: ServeOptions): Promise<void> {
   const { project } = options;
 
-  // Load project config
-  const config = await loadProjectConfig(project);
-  if (!config) {
-    console.error(`Project "${project}" not found.`);
-    console.error("Run 'list' command to see available projects.");
-    process.exit(1);
-  }
-
-  const backendType = config.backend as BackendType;
-
-  // Validate backend is available before proceeding
-  const loadResult = await loadBackend(backendType);
-  if (!loadResult.success) {
-    const error = loadResult.error!;
-    console.error(`\nBackend Error: ${error.message}`);
-    if (error.details) {
-      console.error(`Details: ${error.details}`);
-    }
-    if (error.suggestion) {
-      console.error(`\n${error.suggestion}`);
-    }
-    process.exit(1);
-  }
+  const config = await requireProjectConfig(project);
+  const backendType = config.backend;
+  await requireBackend(backendType);
 
   let backend: Backend;
-
-  // Backend-specific initialization logic
   switch (backendType) {
     case "mintlify":
       backend = await createMintlifyBackendFromConfig(config);
       break;
-
     case "embedded":
       backend = await createEmbeddedBackendFromConfig(config);
       break;
-
     case "agno":
       backend = await createAgnoBackendFromConfig(config, project);
       break;
-
-    default:
-      // This should never happen if loadBackend succeeded
-      console.error(`Unknown backend type: ${backendType}`);
-      process.exit(1);
   }
 
-  // Start MCP server
   console.error(`Starting MCP server for "${config.name}"...`);
   await startMcpServer(backend, config.name);
 }
@@ -89,30 +56,29 @@ export async function serveCommand(options: ServeOptions): Promise<void> {
  * Create Mintlify backend from project config
  */
 async function createMintlifyBackendFromConfig(
-  config: NonNullable<Awaited<ReturnType<typeof loadProjectConfig>>>,
+  config: ProjectConfig,
 ): Promise<Backend> {
-  if (!config.mintlify) {
-    console.error("Mintlify configuration missing in project config.");
+  const factory = await getBackend("mintlify");
+  try {
+    return factory.create(buildBackendOptions(config, "mintlify"));
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : String(err));
     process.exit(1);
   }
-
-  const factory = await getBackend("mintlify");
-  return factory.create({
-    projectId: config.mintlify.project_id,
-    domain: config.mintlify.domain,
-  });
 }
 
 /**
  * Create embedded backend from project config
  */
 async function createEmbeddedBackendFromConfig(
-  config: NonNullable<Awaited<ReturnType<typeof loadProjectConfig>>>,
+  config: ProjectConfig,
 ): Promise<Backend> {
-  // Validate environment for cloud mode (prompt if interactive)
   if (!config.embedded?.local) {
-    const hasApiKey = await ensureOpenAIApiKey();
-    if (!hasApiKey) {
+    const ok = await ensureProviderKeys({
+      llm: config.embedded?.llm_provider,
+      embedding: config.embedded?.embedding_provider,
+    });
+    if (!ok) {
       console.error(
         "Tip: Reconfigure the project with --local flag for Ollama.",
       );
@@ -125,18 +91,8 @@ async function createEmbeddedBackendFromConfig(
   );
 
   const factory = await getBackend("embedded");
-  const backend = await factory.create({
-    projectId: config.id,
-    projectPath: paths.project(config.id),
-    local: config.embedded?.local,
-    llmProvider: config.embedded?.llm_provider,
-    llmModel: config.embedded?.llm_model,
-    embeddingProvider: config.embedded?.embedding_provider,
-    embeddingModel: config.embedded?.embedding_model,
-    ollamaBaseUrl: config.embedded?.ollama_base_url,
-  });
+  const backend = await factory.create(buildBackendOptions(config, "embedded"));
 
-  // Check if knowledge base has documents
   const isAvailable = await backend.isAvailable();
   if (!isAvailable) {
     console.error(
@@ -148,21 +104,19 @@ async function createEmbeddedBackendFromConfig(
 }
 
 /**
- * Create Agno backend from project config
- * Handles Python server lifecycle
+ * Create Agno backend from project config. Starts the Python server if needed.
  */
 async function createAgnoBackendFromConfig(
-  config: NonNullable<Awaited<ReturnType<typeof loadProjectConfig>>>,
+  config: ProjectConfig,
   project: string,
 ): Promise<Backend> {
   const host = config.agno?.host || DEFAULT_HOST;
   const port = config.agno?.port || DEFAULT_PORT;
 
-  // Check if the correct agent is running
   const agentExists = await isAgentRunning(project, port, host);
 
   if (!agentExists) {
-    // Server might be running with different project - need to restart
+    // Different project may be holding the port; stop it before starting ours.
     if (await isServerRunning(port, host)) {
       console.error(`Stopping existing server on port ${port}...`);
       await stopServer(port);

@@ -3,6 +3,7 @@
 // =============================================================================
 
 import { generateText, stepCountIs } from "ai";
+import type { ProviderType } from "../../config/schema";
 import type { BackendFactory } from "../registry";
 import type { AskResult, Backend } from "../types";
 import {
@@ -228,6 +229,7 @@ export { createKnowledge, EmbeddedKnowledge } from "./knowledge";
 export {
   createEmbedder,
   createLLM,
+  GoogleEmbedder,
   OllamaEmbedder,
   OpenAIEmbedder,
 } from "./providers";
@@ -243,9 +245,9 @@ export interface EmbeddedBackendOptions {
   projectId: string;
   projectPath: string;
   local?: boolean;
-  llmProvider?: "openai" | "ollama";
+  llmProvider?: ProviderType;
   llmModel?: string;
-  embeddingProvider?: "openai" | "ollama";
+  embeddingProvider?: ProviderType;
   embeddingModel?: string;
   ollamaBaseUrl?: string;
 }

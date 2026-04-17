@@ -21,11 +21,9 @@ export interface BackendFactory<TOptions = unknown> {
   create: (options: TOptions) => Promise<Backend>;
 }
 
-export interface BackendLoadResult {
-  success: boolean;
-  factory?: BackendFactory;
-  error?: BackendLoadError;
-}
+export type BackendLoadResult =
+  | { success: true; factory: BackendFactory }
+  | { success: false; error: BackendLoadError };
 
 export interface BackendLoadError {
   type: "not_found" | "dependency_missing" | "import_error";
@@ -51,9 +49,9 @@ const cache = new Map<BackendType, BackendFactory>();
 export async function loadBackend(
   type: BackendType,
 ): Promise<BackendLoadResult> {
-  // Return from cache if already loaded
-  if (cache.has(type)) {
-    return { success: true, factory: cache.get(type)! };
+  const cached = cache.get(type);
+  if (cached) {
+    return { success: true, factory: cached };
   }
 
   // Validate backend type is known
@@ -103,8 +101,8 @@ export async function loadBackend(
 export async function getBackend(type: BackendType): Promise<BackendFactory> {
   const result = await loadBackend(type);
 
-  if (!result.success || !result.factory) {
-    const err = result.error!;
+  if (!result.success) {
+    const err = result.error;
     throw new Error(
       [err.message, err.details, err.suggestion].filter(Boolean).join("\n"),
     );

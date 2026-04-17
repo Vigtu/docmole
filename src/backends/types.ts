@@ -2,6 +2,8 @@
 // BACKEND INTERFACE
 // =============================================================================
 
+import type { ProviderType } from "../config/schema";
+
 export interface AskResult {
   answer: string;
   sources?: string[];
@@ -45,12 +47,12 @@ export interface EmbeddedBackendConfig extends BackendConfig {
   type: "embedded";
   /** Use local providers (Ollama) instead of cloud (OpenAI) */
   local?: boolean;
-  /** LLM provider: 'openai' or 'ollama' */
-  llmProvider?: "openai" | "ollama";
+  /** LLM provider: 'openai', 'ollama', or 'google' */
+  llmProvider?: ProviderType;
   /** LLM model name */
   llmModel?: string;
-  /** Embedding provider: 'openai' or 'ollama' */
-  embeddingProvider?: "openai" | "ollama";
+  /** Embedding provider: 'openai', 'ollama', or 'google' */
+  embeddingProvider?: ProviderType;
   /** Embedding model name */
   embeddingModel?: string;
   /** Ollama base URL (default: http://localhost:11434) */
