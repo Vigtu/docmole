@@ -1,8 +1,5 @@
 import { getAllProjects } from "../config/loader";
-
-// =============================================================================
-// LIST COMMAND - List all projects
-// =============================================================================
+import { redactUrl } from "../util/redact";
 
 export async function listCommand(): Promise<void> {
   const projects = await getAllProjects();
@@ -10,25 +7,25 @@ export async function listCommand(): Promise<void> {
   if (projects.length === 0) {
     console.log("No projects found.");
     console.log("\nCreate one with:");
-    console.log("  docmole create --url <docs-url> --id <project-id>");
+    console.log("  docmole setup --url <docs-url> --id <project-id>");
     return;
   }
 
   console.log("Projects:\n");
 
   for (const project of projects) {
-    const status = project.seeding?.status || "unknown";
-    const docs = project.seeding?.documents_count || 0;
-    const backend = project.backend;
+    const indexed = project.indexed;
+    const statusLine = indexed
+      ? `${indexed.status} (${indexed.pages_count ?? 0} pages)`
+      : "not indexed";
 
     console.log(`  ${project.id}`);
-    console.log(`    Name:     ${project.name}`);
-    console.log(`    URL:      ${project.source.url}`);
-    console.log(`    Backend:  ${backend}`);
-    console.log(`    Status:   ${status} (${docs} docs)`);
+    console.log(`    Name:   ${project.name}`);
+    console.log(`    URL:    ${redactUrl(project.source.url)}`);
+    console.log(`    Status: ${statusLine}`);
 
     if (project.source.prefix) {
-      console.log(`    Prefix:   ${project.source.prefix}`);
+      console.log(`    Prefix: ${project.source.prefix}`);
     }
 
     console.log();

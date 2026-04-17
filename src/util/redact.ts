@@ -1,7 +1,5 @@
 const SENSITIVE_QUERY_PARAM = /token|key|secret|auth/i;
 
-// Strips userinfo and redacts sensitive query param values.
-// Returns the input untouched if it can't be parsed as a URL.
 export function redactUrl(input: string): string {
   let parsed: URL;
   try {

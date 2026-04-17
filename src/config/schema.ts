@@ -14,12 +14,10 @@ export function isValidProjectId(id: string): boolean {
   return PROJECT_ID_PATTERN.test(id);
 }
 
-export type DiscoveryMethod = "sitemap" | "mintjson";
-
 export interface ProjectSource {
   url: string;
   prefix?: string;
-  discovery?: DiscoveryMethod;
+  discovery?: "sitemap" | "mintjson";
   auth?: AuthRef;
 }
 
@@ -40,7 +38,7 @@ export interface ProjectConfig {
 export interface CreateProjectOptions {
   name?: string;
   prefix?: string;
-  discovery?: DiscoveryMethod;
+  discovery?: "sitemap" | "mintjson";
   auth?: AuthRef;
 }
 
