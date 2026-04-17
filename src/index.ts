@@ -2,6 +2,7 @@
 
 // docmole - AI documentation assistant that digs through any docs site
 import { createMintlifyBackend } from "./backends/mintlify";
+import { askCommand } from "./cli/ask";
 // Legacy commands (kept for backward compatibility)
 import { createCommand } from "./cli/create";
 import { listCommand } from "./cli/list";
@@ -10,6 +11,7 @@ import { serveCommand } from "./cli/serve";
 import { setupCommand } from "./cli/setup";
 import { startCommand } from "./cli/start";
 import { stopAllCommand, stopCommand } from "./cli/stop";
+import type { ProviderType } from "./config/schema";
 import { startMcpServer } from "./server";
 
 // =============================================================================
@@ -189,14 +191,10 @@ async function main(): Promise<void> {
         port: parsed.flags.port
           ? parseInt(parsed.flags.port as string, 10)
           : undefined,
-        llmProvider: parsed.flags.llmProvider as
-          | "openai"
-          | "ollama"
-          | undefined,
+        llmProvider: parsed.flags.llmProvider as ProviderType | undefined,
         llmModel: parsed.flags.llmModel as string | undefined,
         embeddingProvider: parsed.flags.embeddingProvider as
-          | "openai"
-          | "ollama"
+          | ProviderType
           | undefined,
         embeddingModel: parsed.flags.embeddingModel as string | undefined,
         verbose: Boolean(parsed.flags.verbose),
@@ -210,6 +208,23 @@ async function main(): Promise<void> {
         process.exit(1);
       }
       await serveCommand({ project: parsed.flags.project as string });
+      break;
+
+    case "ask":
+      if (!parsed.flags.project) {
+        console.error("Error: --project is required for ask command");
+        console.error(`Usage: ${CLI_NAME} ask --project <id> "your question"`);
+        process.exit(1);
+      }
+      if (parsed.positional.length === 0) {
+        console.error("Error: question is required");
+        console.error(`Usage: ${CLI_NAME} ask --project <id> "your question"`);
+        process.exit(1);
+      }
+      await askCommand({
+        project: parsed.flags.project as string,
+        question: parsed.positional.join(" "),
+      });
       break;
 
     case "list":
