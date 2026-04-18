@@ -1,11 +1,12 @@
 import { projectExists, saveProjectConfig } from "../config/loader";
 import { paths } from "../config/paths";
 import {
-  type AuthRef,
   createDefaultProjectConfig,
+  type IndexStatus,
   isValidProjectId,
-  parseAuthRef,
+  type ProjectConfig,
 } from "../config/schema";
+import { crawlPages } from "../crawler";
 import { discoverPages } from "../discovery";
 import { redactUrl } from "../util/redact";
 
@@ -15,11 +16,20 @@ export interface SetupOptions {
   name?: string;
   prefix?: string;
   auth?: string;
+  skipCrawl?: boolean;
   verbose?: boolean;
 }
 
 export async function setupCommand(options: SetupOptions): Promise<void> {
-  const { url, id, name, prefix, auth, verbose = false } = options;
+  const {
+    url,
+    id,
+    name,
+    prefix,
+    auth,
+    skipCrawl = false,
+    verbose = false,
+  } = options;
 
   console.log("\nSetting up documentation project...\n");
 
@@ -35,9 +45,13 @@ export async function setupCommand(options: SetupOptions): Promise<void> {
     process.exit(1);
   }
 
+  if (auth) {
+    console.error("Error: --auth is not yet supported; use a public URL.");
+    process.exit(1);
+  }
+
   const parsedUrl = parseUrl(url);
   const normalizedUrl = normalizeUrl(parsedUrl);
-  const authRef = validateAuthFlag(auth);
 
   console.log(`Discovering pages from ${redactUrl(normalizedUrl)}...`);
 
@@ -58,12 +72,46 @@ export async function setupCommand(options: SetupOptions): Promise<void> {
     name: name || siteNameFromHostname(parsedUrl.hostname),
     prefix,
     discovery: discovery.method,
-    auth: authRef,
   });
 
-  await saveProjectConfig(config);
+  if (skipCrawl) {
+    await saveProjectConfig(config);
+    console.log(`Config saved to: ${paths.projectConfig(id)}`);
+    console.log("Skipping crawl (--skip-crawl). Run setup again to fetch.");
+    return;
+  }
 
+  console.log(
+    `Crawling ${discovery.pages.length} pages into ${paths.projectPages(id)}...`,
+  );
+
+  const result = await crawlPages(id, discovery.pages, { verbose });
+  console.log(
+    `Done. fetched=${result.fetched} failed=${result.failed} skipped=${result.skipped}`,
+  );
+
+  const finalStatus: IndexStatus["status"] =
+    result.fetched > 0 ? "completed" : "failed";
+  recordIndexed(config, finalStatus, result.fetched);
+  await saveProjectConfig(config);
   console.log(`Config saved to: ${paths.projectConfig(id)}`);
+
+  if (finalStatus === "failed") {
+    console.error("Error: no pages were fetched successfully.");
+    process.exit(1);
+  }
+}
+
+function recordIndexed(
+  config: ProjectConfig,
+  status: IndexStatus["status"],
+  pagesCount: number,
+): void {
+  config.indexed = {
+    status,
+    at: new Date().toISOString(),
+    pages_count: pagesCount,
+  };
 }
 
 function parseUrl(url: string): URL {
@@ -80,16 +128,6 @@ function normalizeUrl(parsed: URL): string {
     /\/$/,
     "",
   );
-}
-
-function validateAuthFlag(auth: string | undefined): AuthRef | undefined {
-  if (!auth) return undefined;
-  const ref = parseAuthRef(auth);
-  if (ref) return ref;
-  console.error(
-    `Error: invalid --auth "${auth}". Expected "keyring:<service>:<account>" or "localEnv:<VAR>".`,
-  );
-  process.exit(1);
 }
 
 function siteNameFromHostname(hostname: string): string {

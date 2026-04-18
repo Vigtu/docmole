@@ -7,10 +7,10 @@ const CLI_NAME = "docmole";
 
 function showHelp(): void {
   console.log(`
-${CLI_NAME} — dig through any documentation with AI
+${CLI_NAME} — local markdown mirror of any documentation site, built for CLI agents
 
 COMMANDS:
-  setup   Create a new project (discover pages + save config)
+  setup   Discover + crawl pages into a local markdown tree
   list    List all configured projects
 
 SETUP OPTIONS:
@@ -18,13 +18,13 @@ SETUP OPTIONS:
   --id <id>       Project ID (lowercase, numbers, hyphens) (required)
   --name <name>   Display name (optional)
   --prefix <path> Only include pages under this path (optional)
-  --auth <ref>    Auth reference for private docs. Examples:
-                    keyring:docmole:<account>
-                    localEnv:<VAR_NAME>
-                  Never pass raw credentials on the command line.
+  --skip-crawl    Save config and exit without fetching pages
+  --verbose       Stream per-page fetch results to stderr
+  --auth <ref>    Not yet supported — public docs only in this release.
 
 EXAMPLES:
   ${CLI_NAME} setup --url https://docs.agno.com --id agno
+  ${CLI_NAME} setup --url https://react.dev --id react --prefix /learn
   ${CLI_NAME} list
 `);
 }
@@ -115,6 +115,7 @@ async function main(): Promise<void> {
         name: parsed.flags.name as string | undefined,
         prefix: parsed.flags.prefix as string | undefined,
         auth: parsed.flags.auth as string | undefined,
+        skipCrawl: Boolean(parsed.flags.skipCrawl),
         verbose: Boolean(parsed.flags.verbose),
       });
       break;
