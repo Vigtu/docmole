@@ -35,7 +35,7 @@ async function tryMarkdownFastpath(
   const response = await safeFetch(mdUrl, {
     Accept: "text/markdown, text/plain",
   });
-  if (!response || !response.ok) return null;
+  if (!response?.ok) return null;
 
   const contentType = response.headers.get("content-type") || "";
   if (contentType.includes("html")) return null;
@@ -55,12 +55,12 @@ async function tryHtmlFallback(
   urlPath: string,
 ): Promise<FetchedPage | null> {
   const response = await safeFetch(pageUrl, { Accept: "text/html" });
-  if (!response || !response.ok) return null;
+  if (!response?.ok) return null;
 
   const html = await response.text();
   const dom = new JSDOM(html, { url: pageUrl });
   const article = new Readability(dom.window.document).parse();
-  if (!article || !article.content) return null;
+  if (!article?.content) return null;
 
   const markdown = turndown.turndown(article.content);
   if (!markdown.trim()) return null;
