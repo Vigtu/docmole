@@ -46,12 +46,17 @@
   },
   "dependencies": {
     "@lancedb/lancedb": "^0.23.0",
+    "@mozilla/readability": "^0.6.0",
     "fast-xml-parser": "^5.3.3",
+    "jsdom": "^29.0.2",
+    "turndown": "^7.2.4",
     "yaml": "^2.8.2"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.11",
     "@types/bun": "latest",
+    "@types/jsdom": "^28.0.1",
+    "@types/turndown": "^5.0.6",
     "typescript": "^5.3.0"
   }
 }
