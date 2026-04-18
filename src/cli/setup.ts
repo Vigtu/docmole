@@ -8,6 +8,7 @@ import {
 } from "../config/schema";
 import { crawlPages } from "../crawler";
 import { discoverPages } from "../discovery";
+import { buildSearchIndex } from "../search/index-build";
 import { redactUrl } from "../util/redact";
 
 export interface SetupOptions {
@@ -100,6 +101,12 @@ export async function setupCommand(options: SetupOptions): Promise<void> {
     console.error("Error: no pages were fetched successfully.");
     process.exit(1);
   }
+
+  console.log("Building search index...");
+  const index = await buildSearchIndex(id);
+  console.log(
+    `Indexed ${index.docs.length} pages (${Object.keys(index.postings).length} unique tokens).`,
+  );
 }
 
 function recordIndexed(
