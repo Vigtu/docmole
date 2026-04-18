@@ -1,5 +1,6 @@
-import { readdir } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import YAML from "yaml";
+import { pathExists, writeWithParents } from "../util/fs";
 import { paths } from "./paths";
 import type { ProjectConfig } from "./schema";
 
@@ -7,7 +8,7 @@ export async function loadProjectConfig(
   projectId: string,
 ): Promise<ProjectConfig | null> {
   try {
-    const content = await Bun.file(paths.projectConfig(projectId)).text();
+    const content = await readFile(paths.projectConfig(projectId), "utf-8");
     return YAML.parse(content) as ProjectConfig;
   } catch {
     return null;
@@ -15,8 +16,10 @@ export async function loadProjectConfig(
 }
 
 export async function saveProjectConfig(config: ProjectConfig): Promise<void> {
-  const content = YAML.stringify(config, { indent: 2 });
-  await Bun.write(paths.projectConfig(config.id), content);
+  await writeWithParents(
+    paths.projectConfig(config.id),
+    YAML.stringify(config, { indent: 2 }),
+  );
 }
 
 export async function getAllProjects(): Promise<ProjectConfig[]> {
@@ -26,5 +29,5 @@ export async function getAllProjects(): Promise<ProjectConfig[]> {
 }
 
 export async function projectExists(projectId: string): Promise<boolean> {
-  return Bun.file(paths.projectConfig(projectId)).exists();
+  return pathExists(paths.projectConfig(projectId));
 }

@@ -1,7 +1,6 @@
-import { mkdir } from "node:fs/promises";
-import { dirname } from "node:path";
 import { paths } from "../config/paths";
 import type { DiscoveredPage } from "../discovery";
+import { writeWithParents } from "../util/fs";
 import { UnsafeUrlPathError, urlPathToFilePath } from "../util/path";
 import { redactUrl } from "../util/redact";
 import { fetchPage } from "./fetch";
@@ -83,9 +82,10 @@ async function handleOne(
     title: fetched.title,
   };
 
-  const filePath = paths.projectPage(projectId, relPath);
-  await mkdir(dirname(filePath), { recursive: true });
-  await Bun.write(filePath, serializePage(frontmatter, fetched.markdown));
+  await writeWithParents(
+    paths.projectPage(projectId, relPath),
+    serializePage(frontmatter, fetched.markdown),
+  );
 
   result.fetched++;
   if (verbose) console.error(`ok (${fetched.source}): ${relPath}`);

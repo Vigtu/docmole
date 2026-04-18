@@ -1,6 +1,7 @@
-import { readdir } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 import { paths } from "../config/paths";
+import { writeWithParents } from "../util/fs";
 import { tokenize } from "./bm25";
 import { parsePage } from "./page";
 import { INDEX_VERSION, type IndexedDoc, type SearchIndex } from "./types";
@@ -18,7 +19,7 @@ export async function buildSearchIndex(
   let totalLength = 0;
 
   for (const absFile of files) {
-    const content = await Bun.file(absFile).text();
+    const content = await readFile(absFile, "utf-8");
     const parsed = parsePage(content);
     if (!parsed) continue;
 
@@ -61,7 +62,7 @@ export async function buildSearchIndex(
     avg_length: avgLength,
   };
 
-  await Bun.write(
+  await writeWithParents(
     paths.projectSearchIndex(projectId),
     JSON.stringify(serialized),
   );

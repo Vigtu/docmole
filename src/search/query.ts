@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { paths } from "../config/paths";
 import { scoreBM25, tokenize } from "./bm25";
 import { parsePage } from "./page";
@@ -27,9 +28,8 @@ export class SearchIndexVersionError extends Error {
 export async function loadSearchIndex(projectId: string): Promise<SearchIndex> {
   let index: SearchIndex;
   try {
-    index = (await Bun.file(
-      paths.projectSearchIndex(projectId),
-    ).json()) as SearchIndex;
+    const raw = await readFile(paths.projectSearchIndex(projectId), "utf-8");
+    index = JSON.parse(raw) as SearchIndex;
   } catch {
     throw new SearchIndexMissingError(projectId);
   }
@@ -92,7 +92,7 @@ async function buildSnippet(
   tokens: Map<string, number>,
   pattern: RegExp | null,
 ): Promise<string> {
-  const content = await Bun.file(absPath).text();
+  const content = await readFile(absPath, "utf-8");
   const parsed = parsePage(content);
   const body = parsed ? parsed.body : content;
   const compact = body.replace(/\s+/g, " ").trim();
