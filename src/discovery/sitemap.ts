@@ -1,8 +1,5 @@
 import { XMLParser } from "fast-xml-parser";
-
-// =============================================================================
-// SITEMAP.XML PARSER - Using Bun's native fetch
-// =============================================================================
+import { USER_AGENT } from "../util/http";
 
 export interface DiscoveredPage {
   url: string;
@@ -28,7 +25,7 @@ export async function parseSitemap(baseUrl: string): Promise<DiscoveredPage[]> {
   try {
     const response = await fetch(sitemapUrl, {
       headers: {
-        "User-Agent": "docmole/1.0",
+        "User-Agent": USER_AGENT,
         Accept: "application/xml, text/xml, */*",
       },
     });

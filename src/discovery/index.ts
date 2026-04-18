@@ -1,13 +1,8 @@
+import { USER_AGENT } from "../util/http";
 import { parseMintJson } from "./mintjson";
 import { type DiscoveredPage, filterByPrefix, parseSitemap } from "./sitemap";
 
-export {
-  extractDescription,
-  extractMetadata,
-  extractTitle,
-  fetchWithMetadata,
-  type PageMetadata,
-} from "./metadata";
+export { extractTitle } from "./metadata";
 
 // =============================================================================
 // DISCOVERY ENGINE - Orchestrates page discovery
@@ -85,37 +80,23 @@ export async function discoverPages(
 export async function isMintlifySite(baseUrl: string): Promise<boolean> {
   const normalizedUrl = baseUrl.replace(/\/$/, "");
 
-  // Check for mint.json (definitive indicator)
   try {
     const response = await fetch(`${normalizedUrl}/mint.json`, {
       method: "HEAD",
-      headers: { "User-Agent": "docmole/1.0" },
+      headers: { "User-Agent": USER_AGENT },
     });
     if (response.ok) return true;
   } catch {
-    // Continue checking
+    // fall through to sitemap check
   }
 
-  // Check for sitemap.xml (less definitive but common)
   try {
     const response = await fetch(`${normalizedUrl}/sitemap.xml`, {
       method: "HEAD",
-      headers: { "User-Agent": "docmole/1.0" },
+      headers: { "User-Agent": USER_AGENT },
     });
     return response.ok;
   } catch {
     return false;
   }
-}
-
-/** Get the markdown URL for a page */
-export function getMarkdownUrl(page: DiscoveredPage): string {
-  // Mintlify serves markdown at {path}.md
-  const url = page.url.replace(/\/$/, "");
-  return `${url}.md`;
-}
-
-/** Batch get markdown URLs */
-export function getMarkdownUrls(pages: DiscoveredPage[]): string[] {
-  return pages.map(getMarkdownUrl);
 }

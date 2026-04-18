@@ -1,8 +1,5 @@
+import { USER_AGENT } from "../util/http";
 import type { DiscoveredPage } from "./sitemap";
-
-// =============================================================================
-// MINT.JSON PARSER - Using Bun's native fetch
-// =============================================================================
 
 interface MintNavItem {
   group?: string;
@@ -25,7 +22,7 @@ export async function parseMintJson(
   try {
     const response = await fetch(mintUrl, {
       headers: {
-        "User-Agent": "docmole/1.0",
+        "User-Agent": USER_AGENT,
         Accept: "application/json",
       },
     });
