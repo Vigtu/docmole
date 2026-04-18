@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 
+import { installCommand } from "./cli/install";
 import { listCommand } from "./cli/list";
 import { searchCommand } from "./cli/search";
 import { setupCommand } from "./cli/setup";
@@ -13,6 +14,7 @@ ${CLI_NAME} — local markdown mirror of any documentation site, built for CLI a
 COMMANDS:
   setup    Discover + crawl pages into a local markdown tree, then build a search index
   search   BM25 keyword search over an indexed project; returns paths + snippets
+  install  Install the docmole skill into .claude/skills/ for CLI agents
   list     List all configured projects
 
 SETUP OPTIONS:
@@ -29,10 +31,16 @@ SEARCH OPTIONS:
   --limit <n>     Max results (default 5)
   --raw           Emit JSON array only (no framing). Designed for pipes.
 
+INSTALL OPTIONS:
+  --skills        Install the docmole skill (required)
+  --force         Overwrite an existing skill directory
+  --target <dir>  Install base (default: current directory)
+
 EXAMPLES:
   ${CLI_NAME} setup --url https://docs.agno.com --id agno
   ${CLI_NAME} search --project agno "persist agent session storage"
   ${CLI_NAME} search --project agno --raw "auth ref resolution" | jq '.[0].abs'
+  ${CLI_NAME} install --skills
   ${CLI_NAME} list
 `);
 }
@@ -43,7 +51,14 @@ interface ParsedArgs {
   positional: string[];
 }
 
-const BOOLEAN_FLAGS = new Set(["help", "verbose", "raw", "skipCrawl"]);
+const BOOLEAN_FLAGS = new Set([
+  "help",
+  "verbose",
+  "raw",
+  "skipCrawl",
+  "skills",
+  "force",
+]);
 
 function toCamel(key: string): string {
   return key.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
@@ -163,6 +178,14 @@ async function main(): Promise<void> {
       });
       break;
     }
+
+    case "install":
+      await installCommand({
+        skills: Boolean(parsed.flags.skills),
+        force: Boolean(parsed.flags.force),
+        target: parsed.flags.target as string | undefined,
+      });
+      break;
 
     case "list":
       await listCommand();
