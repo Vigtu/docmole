@@ -8,4 +8,7 @@ export const paths = {
   projects: join(DATA_DIR, "projects"),
   project: (id: string) => join(DATA_DIR, "projects", id),
   projectConfig: (id: string) => join(DATA_DIR, "projects", id, "config.yaml"),
+  projectPages: (id: string) => join(DATA_DIR, "projects", id, "pages"),
+  projectPage: (id: string, relPath: string) =>
+    join(DATA_DIR, "projects", id, "pages", relPath),
 };
