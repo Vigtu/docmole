@@ -10,6 +10,12 @@ const SKILL_NAME = "docmole";
 // missing package.json walk indefinitely up the filesystem.
 const PACKAGE_ROOT_LOOKUP_LIMIT = 5;
 
+// Claude Code only watches `.claude/skills/` directories that existed at
+// session start. If we install a skill into a fresh dir while a session is
+// already open, the agent won't pick it up until the user restarts.
+export const RESTART_HINT =
+  "Restart Claude Code if it was already open in this directory — new skill directories are only watched from session start.";
+
 export interface InstallOptions {
   skills: boolean;
   force?: boolean;
@@ -22,13 +28,8 @@ export async function installCommand(options: InstallOptions): Promise<void> {
     process.exit(1);
   }
 
-  const source = resolveBundledSkill();
-  const target = resolve(
-    options.target ?? process.cwd(),
-    ".claude",
-    "skills",
-    SKILL_NAME,
-  );
+  const baseDir = options.target ?? process.cwd();
+  const target = skillTarget(baseDir);
 
   if (!options.force && (await pathExists(target))) {
     console.error(`Error: ${target} already exists.`);
@@ -37,8 +38,26 @@ export async function installCommand(options: InstallOptions): Promise<void> {
   }
 
   await mkdir(dirname(target), { recursive: true });
-  await cp(source, target, { recursive: true, force: Boolean(options.force) });
+  await cp(resolveBundledSkill(), target, {
+    recursive: true,
+    force: options.force,
+  });
   console.log(`Installed docmole skill to ${target}`);
+  console.log(RESTART_HINT);
+}
+
+// Idempotent install for `setup` auto-install. Returns the target path if the
+// skill was written, or `null` if the skill was already present (skipped).
+export async function writeSkill(baseDir: string): Promise<string | null> {
+  const target = skillTarget(baseDir);
+  if (await pathExists(target)) return null;
+  await mkdir(dirname(target), { recursive: true });
+  await cp(resolveBundledSkill(), target, { recursive: true });
+  return target;
+}
+
+function skillTarget(baseDir: string): string {
+  return resolve(baseDir, ".claude", "skills", SKILL_NAME);
 }
 
 // Walks up looking for package.json so this resolves correctly in BOTH

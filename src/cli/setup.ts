@@ -10,6 +10,7 @@ import { crawlPages } from "../crawler";
 import { discoverPages } from "../discovery";
 import { buildSearchIndex } from "../search/index-build";
 import { redactUrl } from "../util/redact";
+import { RESTART_HINT, writeSkill } from "./install";
 
 export interface SetupOptions {
   url: string;
@@ -107,6 +108,22 @@ export async function setupCommand(options: SetupOptions): Promise<void> {
   console.log(
     `Indexed ${index.docs.length} pages (${Object.keys(index.postings).length} unique tokens).`,
   );
+
+  await ensureSkillInstalled();
+}
+
+async function ensureSkillInstalled(): Promise<void> {
+  try {
+    const target = await writeSkill(process.cwd());
+    if (target) {
+      console.log(`Installed docmole skill to ${target}`);
+      console.log(RESTART_HINT);
+    }
+  } catch (err) {
+    console.error(
+      `Warning: could not auto-install skill (${(err as Error).message}). Run \`docmole install --skills\` manually.`,
+    );
+  }
 }
 
 function recordIndexed(

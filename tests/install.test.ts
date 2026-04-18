@@ -3,6 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { writeSkill } from "../src/cli/install";
 
 const CLI = join(import.meta.dir, "..", "src", "index.ts");
 
@@ -66,5 +67,28 @@ describe("install --skills", () => {
     expect(await Bun.file(join(existing, "SKILL.md")).text()).toContain(
       "name: docmole",
     );
+  });
+});
+
+describe("writeSkill (auto-install)", () => {
+  test("writes SKILL.md on first call", async () => {
+    const base = mkdtempSync(join(tmpdir(), "docmole-auto-"));
+    const target = await writeSkill(base);
+    expect(target).not.toBeNull();
+    expect(await Bun.file(join(target as string, "SKILL.md")).exists()).toBe(
+      true,
+    );
+  });
+
+  test("is idempotent — returns null and preserves existing when present", async () => {
+    const base = mkdtempSync(join(tmpdir(), "docmole-auto-"));
+    await writeSkill(base);
+    await writeFile(join(base, ".claude/skills/docmole/SKILL.md"), "custom");
+
+    const target = await writeSkill(base);
+    expect(target).toBeNull();
+    expect(
+      await Bun.file(join(base, ".claude/skills/docmole/SKILL.md")).text(),
+    ).toBe("custom");
   });
 });
