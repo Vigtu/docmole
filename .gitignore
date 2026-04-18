@@ -42,3 +42,4 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .uv/
+.claude/skills/docmole/
