@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { listCommand } from "./cli/list";
+import { searchCommand } from "./cli/search";
 import { setupCommand } from "./cli/setup";
 
 const CLI_NAME = "docmole";
@@ -10,8 +11,9 @@ function showHelp(): void {
 ${CLI_NAME} — local markdown mirror of any documentation site, built for CLI agents
 
 COMMANDS:
-  setup   Discover + crawl pages into a local markdown tree
-  list    List all configured projects
+  setup    Discover + crawl pages into a local markdown tree, then build a search index
+  search   BM25 keyword search over an indexed project; returns paths + snippets
+  list     List all configured projects
 
 SETUP OPTIONS:
   --url <url>     Documentation site URL (required)
@@ -22,9 +24,15 @@ SETUP OPTIONS:
   --verbose       Stream per-page fetch results to stderr
   --auth <ref>    Not yet supported — public docs only in this release.
 
+SEARCH OPTIONS:
+  --project <id>  Project to query (required)
+  --limit <n>     Max results (default 5)
+  --raw           Emit JSON array only (no framing). Designed for pipes.
+
 EXAMPLES:
   ${CLI_NAME} setup --url https://docs.agno.com --id agno
-  ${CLI_NAME} setup --url https://react.dev --id react --prefix /learn
+  ${CLI_NAME} search --project agno "persist agent session storage"
+  ${CLI_NAME} search --project agno --raw "auth ref resolution" | jq '.[0].abs'
   ${CLI_NAME} list
 `);
 }
@@ -33,6 +41,12 @@ interface ParsedArgs {
   command?: string;
   flags: Record<string, string | boolean>;
   positional: string[];
+}
+
+const BOOLEAN_FLAGS = new Set(["help", "verbose", "raw", "skipCrawl"]);
+
+function toCamel(key: string): string {
+  return key.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
 }
 
 function parseArgs(args: string[]): ParsedArgs {
@@ -46,14 +60,17 @@ function parseArgs(args: string[]): ParsedArgs {
     } else if (arg === "--verbose" || arg === "-v") {
       result.flags.verbose = true;
     } else if (arg.startsWith("--")) {
-      const key = arg.slice(2);
+      const camelKey = toCamel(arg.slice(2));
+      if (BOOLEAN_FLAGS.has(camelKey)) {
+        result.flags[camelKey] = true;
+        continue;
+      }
       const next = args[i + 1];
       if (next && !next.startsWith("-")) {
-        const camelKey = key.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
         result.flags[camelKey] = next;
         i++;
       } else {
-        result.flags[key] = true;
+        result.flags[camelKey] = true;
       }
     } else if (arg.startsWith("-")) {
       const key = arg.slice(1);
@@ -119,6 +136,33 @@ async function main(): Promise<void> {
         verbose: Boolean(parsed.flags.verbose),
       });
       break;
+
+    case "search": {
+      const project = parsed.flags.project as string | undefined;
+      const query = parsed.positional[0];
+      if (!project || !query) {
+        console.error(
+          `Usage: ${CLI_NAME} search --project <id> "<query>" [--limit <n>] [--raw]`,
+        );
+        process.exit(1);
+      }
+      const limitFlag = parsed.flags.limit;
+      const limit =
+        typeof limitFlag === "string"
+          ? Number.parseInt(limitFlag, 10)
+          : undefined;
+      if (limit !== undefined && (Number.isNaN(limit) || limit <= 0)) {
+        console.error("Error: --limit must be a positive integer.");
+        process.exit(1);
+      }
+      await searchCommand({
+        project,
+        query,
+        limit,
+        raw: Boolean(parsed.flags.raw),
+      });
+      break;
+    }
 
     case "list":
       await listCommand();
