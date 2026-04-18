@@ -1,10 +1,14 @@
 import { XMLParser } from "fast-xml-parser";
-import { USER_AGENT } from "../util/http";
+import { normalizeBaseUrl, USER_AGENT } from "../util/http";
 
+// `title` and `content` are set only by llms-full.txt discovery; other methods
+// leave them undefined and rely on the crawler to fetch + extract.
 export interface DiscoveredPage {
   url: string;
   path: string;
   lastmod?: string;
+  title?: string;
+  content?: string;
 }
 
 interface SitemapUrl {
@@ -20,7 +24,7 @@ interface SitemapUrlset {
 
 /** Parse sitemap.xml from a URL */
 export async function parseSitemap(baseUrl: string): Promise<DiscoveredPage[]> {
-  const sitemapUrl = `${baseUrl.replace(/\/$/, "")}/sitemap.xml`;
+  const sitemapUrl = `${normalizeBaseUrl(baseUrl)}/sitemap.xml`;
 
   try {
     const response = await fetch(sitemapUrl, {

@@ -1,4 +1,4 @@
-import { USER_AGENT } from "../util/http";
+import { normalizeBaseUrl, USER_AGENT } from "../util/http";
 import type { DiscoveredPage } from "./sitemap";
 
 interface MintNavItem {
@@ -17,7 +17,7 @@ interface MintConfig {
 export async function parseMintJson(
   baseUrl: string,
 ): Promise<DiscoveredPage[]> {
-  const mintUrl = `${baseUrl.replace(/\/$/, "")}/mint.json`;
+  const mintUrl = `${normalizeBaseUrl(baseUrl)}/mint.json`;
 
   try {
     const response = await fetch(mintUrl, {
@@ -34,7 +34,7 @@ export async function parseMintJson(
 
     const config = (await response.json()) as MintConfig;
     const pages: DiscoveredPage[] = [];
-    const baseUrlNormalized = baseUrl.replace(/\/$/, "");
+    const baseUrlNormalized = normalizeBaseUrl(baseUrl);
 
     // Extract pages from navigation
     if (config.navigation) {
