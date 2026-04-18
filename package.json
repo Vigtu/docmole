@@ -1,14 +1,14 @@
 {
   "name": "docmole",
   "version": "0.4.4",
-  "description": "Dig through any documentation with AI - MCP server for Claude, Cursor, and other AI assistants",
-  "main": "src/index.ts",
+  "description": "Local markdown mirror + BM25 search for any documentation site, designed for CLI agents (Claude Code, Cursor)",
+  "main": "dist/cli.js",
   "type": "module",
   "bin": {
-    "docmole": "./src/index.ts"
+    "docmole": "./dist/cli.js"
   },
   "files": [
-    "src",
+    "dist",
     "skills",
     "README.md",
     "LICENSE"
@@ -16,25 +16,24 @@
   "scripts": {
     "start": "bun src/index.ts",
     "dev": "bun --watch src/index.ts",
+    "build": "bun scripts/build.ts",
     "test": "bun test",
     "typecheck": "bunx tsc --noEmit",
-    "lint": "biome check --write --unsafe src tests"
+    "lint": "biome check --write --unsafe src tests",
+    "prepublishOnly": "bun run build"
   },
   "keywords": [
     "docmole",
-    "mcp",
     "documentation",
     "docs",
-    "rag",
+    "cli",
+    "bm25",
+    "search",
     "claude",
+    "claude-code",
     "cursor",
-    "ai",
-    "assistant",
-    "model-context-protocol",
-    "anthropic",
-    "bun",
-    "lancedb",
-    "vector-search"
+    "agent",
+    "skills"
   ],
   "author": "Vigtu",
   "license": "MIT",
@@ -43,7 +42,7 @@
     "url": "https://github.com/Vigtu/docmole.git"
   },
   "engines": {
-    "bun": ">=1.0.0"
+    "node": ">=18"
   },
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
