@@ -17,7 +17,7 @@ export function isValidProjectId(id: string): boolean {
 export interface ProjectSource {
   url: string;
   prefix?: string;
-  discovery?: "sitemap" | "mintjson";
+  discovery?: "llmsfull" | "sitemap" | "mintjson";
   auth?: AuthRef;
 }
 
@@ -38,7 +38,7 @@ export interface ProjectConfig {
 export interface CreateProjectOptions {
   name?: string;
   prefix?: string;
-  discovery?: "sitemap" | "mintjson";
+  discovery?: "llmsfull" | "sitemap" | "mintjson";
   auth?: AuthRef;
 }
 

@@ -1,16 +1,13 @@
-import { USER_AGENT } from "../util/http";
+import { normalizeBaseUrl } from "../util/http";
+import { parseLlmsFull } from "./llmsfull";
 import { parseMintJson } from "./mintjson";
 import { type DiscoveredPage, filterByPrefix, parseSitemap } from "./sitemap";
 
 export { extractTitle } from "./metadata";
-
-// =============================================================================
-// DISCOVERY ENGINE - Orchestrates page discovery
-// =============================================================================
-
 export type { DiscoveredPage } from "./sitemap";
 
-export type DiscoveryMethod = "sitemap" | "mintjson" | "auto";
+export type DiscoveryMethod = "llmsfull" | "sitemap" | "mintjson" | "auto";
+export type ResolvedMethod = Exclude<DiscoveryMethod, "auto">;
 
 export interface DiscoveryOptions {
   method?: DiscoveryMethod;
@@ -20,45 +17,51 @@ export interface DiscoveryOptions {
 
 export interface DiscoveryResult {
   pages: DiscoveredPage[];
-  method: "sitemap" | "mintjson";
+  method: ResolvedMethod;
   total: number;
   filtered: number;
 }
 
-/** Discover pages from a documentation site */
+// Auto-mode tries llms-full.txt first: one HTTP call returns the whole site
+// as markdown, canonical quality (author-published, not HTML-extracted).
+// Falls through to sitemap, then mint.json.
+const AUTO_ORDER: { method: ResolvedMethod; parse: Parser }[] = [
+  { method: "llmsfull", parse: parseLlmsFull },
+  { method: "sitemap", parse: parseSitemap },
+  { method: "mintjson", parse: parseMintJson },
+];
+
+type Parser = (baseUrl: string) => Promise<DiscoveredPage[]>;
+
 export async function discoverPages(
   baseUrl: string,
   options: DiscoveryOptions = {},
 ): Promise<DiscoveryResult> {
   const { method = "auto", prefix, verbose = false } = options;
-  const normalizedUrl = baseUrl.replace(/\/$/, "");
+  const normalizedUrl = normalizeBaseUrl(baseUrl);
+  const plan =
+    method === "auto"
+      ? AUTO_ORDER
+      : AUTO_ORDER.filter((step) => step.method === method);
 
   let pages: DiscoveredPage[] = [];
-  let usedMethod: "sitemap" | "mintjson" = "sitemap";
+  let usedMethod: ResolvedMethod = plan[0]?.method ?? "sitemap";
 
-  if (method === "sitemap" || method === "auto") {
-    if (verbose) console.error(`Trying sitemap.xml from ${normalizedUrl}...`);
-    pages = await parseSitemap(normalizedUrl);
-
+  for (const step of plan) {
+    if (verbose)
+      console.error(`Trying ${step.method} from ${normalizedUrl}...`);
+    pages = await step.parse(normalizedUrl);
     if (pages.length > 0) {
-      usedMethod = "sitemap";
-      if (verbose) console.error(`Found ${pages.length} pages in sitemap.xml`);
-    }
-  }
-
-  if (pages.length === 0 && (method === "mintjson" || method === "auto")) {
-    if (verbose) console.error(`Trying mint.json from ${normalizedUrl}...`);
-    pages = await parseMintJson(normalizedUrl);
-
-    if (pages.length > 0) {
-      usedMethod = "mintjson";
-      if (verbose) console.error(`Found ${pages.length} pages in mint.json`);
+      usedMethod = step.method;
+      if (verbose) {
+        console.error(`Found ${pages.length} pages via ${step.method}`);
+      }
+      break;
     }
   }
 
   const totalPages = pages.length;
 
-  // Filter by prefix if specified
   if (prefix && pages.length > 0) {
     pages = filterByPrefix(pages, prefix);
     if (verbose) {
@@ -74,29 +77,4 @@ export async function discoverPages(
     total: totalPages,
     filtered: pages.length,
   };
-}
-
-/** Check if a URL is a valid Mintlify site */
-export async function isMintlifySite(baseUrl: string): Promise<boolean> {
-  const normalizedUrl = baseUrl.replace(/\/$/, "");
-
-  try {
-    const response = await fetch(`${normalizedUrl}/mint.json`, {
-      method: "HEAD",
-      headers: { "User-Agent": USER_AGENT },
-    });
-    if (response.ok) return true;
-  } catch {
-    // fall through to sitemap check
-  }
-
-  try {
-    const response = await fetch(`${normalizedUrl}/sitemap.xml`, {
-      method: "HEAD",
-      headers: { "User-Agent": USER_AGENT },
-    });
-    return response.ok;
-  } catch {
-    return false;
-  }
 }

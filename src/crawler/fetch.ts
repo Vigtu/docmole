@@ -2,9 +2,7 @@ import { Readability } from "@mozilla/readability";
 import { JSDOM } from "jsdom";
 import TurndownService from "turndown";
 import { extractTitle } from "../discovery/metadata";
-import { USER_AGENT } from "../util/http";
-
-const FETCH_TIMEOUT_MS = 30_000;
+import { FETCH_TIMEOUT_MS, normalizeBaseUrl, USER_AGENT } from "../util/http";
 
 const turndown = new TurndownService({
   headingStyle: "atx",
@@ -15,7 +13,7 @@ const turndown = new TurndownService({
 export interface FetchedPage {
   markdown: string;
   title: string;
-  source: "markdown-fastpath" | "html-readability";
+  source: "markdown-fastpath" | "html-readability" | "inline";
 }
 
 export async function fetchPage(
@@ -31,7 +29,7 @@ async function tryMarkdownFastpath(
   pageUrl: string,
   urlPath: string,
 ): Promise<FetchedPage | null> {
-  const normalized = pageUrl.replace(/\/$/, "");
+  const normalized = normalizeBaseUrl(pageUrl);
   const mdUrl = normalized.endsWith(".md") ? normalized : `${normalized}.md`;
 
   const response = await safeFetch(mdUrl, {

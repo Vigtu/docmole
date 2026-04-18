@@ -69,8 +69,15 @@ async function handleOne(
     throw err;
   }
 
-  const fetched = await fetchPage(page.url, page.path);
-  if (!fetched) {
+  const resolved = page.content
+    ? {
+        title: page.title ?? page.path,
+        markdown: page.content,
+        source: "inline" as const,
+      }
+    : await fetchPage(page.url, page.path);
+
+  if (!resolved) {
     result.failed++;
     if (verbose) console.error(`fail: ${redactUrl(page.url)}`);
     return;
@@ -79,14 +86,14 @@ async function handleOne(
   const frontmatter: PageFrontmatter = {
     source_url: page.url,
     fetched_at: new Date().toISOString(),
-    title: fetched.title,
+    title: resolved.title,
   };
 
   await writeWithParents(
     paths.projectPage(projectId, relPath),
-    serializePage(frontmatter, fetched.markdown),
+    serializePage(frontmatter, resolved.markdown),
   );
 
   result.fetched++;
-  if (verbose) console.error(`ok (${fetched.source}): ${relPath}`);
+  if (verbose) console.error(`ok (${resolved.source}): ${relPath}`);
 }
