@@ -45,7 +45,6 @@
     "bun": ">=1.0.0"
   },
   "dependencies": {
-    "@lancedb/lancedb": "^0.23.0",
     "@mozilla/readability": "^0.6.0",
     "fast-xml-parser": "^5.3.3",
     "jsdom": "^29.0.2",
