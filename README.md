@@ -4,175 +4,153 @@
   </a>
 </p>
 
-# Docmole
+# docmole
 
 <p align="center">
-  <em>Dig through any documentation with AI</em>
+  <em>Local markdown mirror + BM25 search for any docs site. Built for CLI agents.</em>
 </p>
 
 [![npm version](https://img.shields.io/npm/v/docmole?cacheSeconds=3600)](https://www.npmjs.com/package/docmole)
 [![License](https://img.shields.io/badge/license-MIT-green)](https://opensource.org/licenses/MIT)
-[![Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1?logo=bun)](https://bun.sh)
-[![MCP](https://img.shields.io/badge/protocol-MCP-blue)](https://modelcontextprotocol.io)
+[![Node](https://img.shields.io/badge/node-%E2%89%A518-brightgreen)](https://nodejs.org)
 
-Docmole is an MCP server that lets you query **any documentation site** from AI assistants like Claude, Cursor, or any MCP-compatible client. The mole digs through docs so you don't have to.
+docmole mirrors any documentation site to local markdown, builds a BM25 search index, and ships a skill package so CLI agents (Claude Code, Cursor) discover and use it automatically. **No embedded LLM. No embeddings. No API keys.** The consuming agent does all semantic work.
 
-## Features
+## docmole vs MCP servers
 
-* 🔍 **Universal docs support** — works with any documentation site
-* 🏠 **Self-hosted RAG** — LanceDB vectors + OpenAI embeddings, no Python needed
-* ⚡ **Zero-setup mode** — instant access to Mintlify-powered sites
-* 🧠 **Multi-turn conversations** — remembers context across questions
-* 🔗 **WebFetch compatible** — links converted to absolute URLs
-* 🔌 **MCP native** — works with Claude, Cursor, and any MCP client
+If you're building for **coding agents**, CLI + skills is the better fit:
 
-### Coming soon
+- **CLI + skills** — token-efficient. Agents invoke concise commands and read files via native `head`/`cat`. No giant tool schemas in context, no verbose accessibility trees. Same pattern as [`@playwright/cli`](https://github.com/microsoft/playwright-cli).
+- **MCP** — good for stateful, long-running loops (self-healing tests, persistent browser context). Overhead not worth it for docs retrieval.
 
-* 🦙 **Ollama support** — fully local mode, no API keys needed
-* 📄 **Generic HTML extraction** — support for non-Mintlify documentation sites
-* 🔄 **Incremental updates** — only re-index changed pages
-
-## Installation
-
-To use Docmole, run it directly with bunx (no install needed):
+## Install
 
 ```bash
-bunx docmole --help
+npm install -g docmole
+docmole --help
 ```
 
-Or install globally:
+Requires Node 18+. No Bun on your machine — the package ships a pre-built Node bundle.
+
+## Quick start
 
 ```bash
-bun install -g docmole
+# 1. Mirror + index a docs site (also auto-installs the skill)
+docmole setup --url https://docs.agno.com --id agno
+
+# 2. Restart Claude Code if it was already open in this dir
+claude
+
+# 3. Ask in natural language
+> how do I persist agent session storage in agno?
 ```
 
-Works on macOS, Linux and Windows. Requires [Bun](https://bun.sh) runtime.
+The agent:
+1. Reads `.claude/skills/docmole/SKILL.md`
+2. Rewrites your question into domain keywords
+3. Runs `docmole search --project agno "<keywords>"`
+4. Batches `head -80` across the top 2 results in one tool call
+5. Answers, citing `source_url` from each page's frontmatter
 
-## Getting started
-
-### Local RAG Mode (any docs site)
-
-Index and query any documentation site. Requires `OPENAI_API_KEY`.
+## Commands
 
 ```bash
-# One-time setup — discovers pages and builds vector index
-bunx docmole setup --url https://docs.example.com --id my-docs
-
-# Start the MCP server
-bunx docmole serve --project my-docs
-```
-
-Add to your MCP client:
-
-```json
-{
-  "mcpServers": {
-    "my-docs": {
-      "command": "bunx",
-      "args": ["docmole", "serve", "--project", "my-docs"]
-    }
-  }
-}
-```
-
-### Mintlify Mode (zero setup)
-
-For sites with [Mintlify AI Assistant](https://mintlify.com) — no API key needed:
-
-```bash
-bunx docmole -p agno-v2
-```
-
-```json
-{
-  "mcpServers": {
-    "agno-docs": {
-      "command": "bunx",
-      "args": ["docmole", "-p", "agno-v2"]
-    }
-  }
-}
-```
-
-## CLI
-
-Docmole has a built-in CLI for all operations:
-
-```bash
-# Mintlify mode (proxy to Mintlify API)
-docmole -p <project-id>
-
-# Local RAG mode
-docmole setup --url <docs-url> --id <project-id>
-docmole serve --project <project-id>
+docmole setup    --url <url> --id <id> [--prefix <path>] [--skip-crawl] [--verbose]
+docmole search   --project <id> "<query>" [--limit <n>] [--raw]
+docmole install  --skills [--force] [--target <dir>]
 docmole list
-docmole stop --project <project-id>
 ```
 
-Run `docmole --help` for all options.
+### setup
+Discovers pages from `sitemap.xml` or `mint.json`, crawls markdown (prefers Mintlify's `.md` fastpath, falls back to HTML → Readability → Turndown), writes to `~/.docmole/projects/<id>/pages/<path>.md` with YAML frontmatter, builds a BM25 index, and auto-installs the skill into `<cwd>/.claude/skills/docmole/`.
 
-## How it works
+### search
+BM25 keyword search with title boost (3×). Default output is human-readable markdown with `<mark>` highlights:
 
 ```
-┌─────────────┐     ┌─────────────┐     ┌──────────────────────┐
-│ MCP Client  │────▶│   Docmole   │────▶│ Embedded: LanceDB    │
-│ (Claude,    │◀────│ MCP Server  │◀────│ Mintlify: API proxy  │
-│  Cursor...) │     └─────────────┘     └──────────────────────┘
-└─────────────┘
+1. sessions/persisting.md — Persisting Sessions (score 4.812)
+   abs: /home/you/.docmole/projects/agno/pages/sessions/persisting.md
+   … configure a <mark>database</mark> to <mark>persist</mark> the <mark>session</mark> …
+
+Next: head -80 /home/.../persisting.md /home/.../session-storage.md
 ```
 
-**Local RAG Mode**: Crawls documentation, generates embeddings with OpenAI, stores in LanceDB. Hybrid search combines semantic and keyword matching.
+Pass `--raw` for pure JSON designed to pipe into `jq`:
 
-**Mintlify Mode**: Proxies requests to Mintlify's AI Assistant API. Zero setup, instant results.
+```bash
+docmole search --project agno --raw "persist session" | jq '.[0].abs'
+```
 
-## Known Mintlify Project IDs
+Each result carries `{path, abs, title, score, snippet}`. Agents paste `abs` directly into `head -80`.
 
-| Documentation | Project ID |
-|--------------|------------|
-| [Agno](https://docs.agno.com) | `agno-v2` |
-| [Resend](https://resend.com/docs) | `resend` |
-| [Mintlify](https://mintlify.com/docs) | `mintlify` |
-| [Vercel](https://vercel.com/docs) | `vercel` |
-| [Upstash](https://upstash.com/docs) | `upstash` |
-| [Plain](https://plain.com/docs) | `plain` |
+### install --skills
+Copies the docmole skill into `.claude/skills/docmole/`. `setup` does this automatically; run `install` explicitly to:
 
-> **Find more**: Open DevTools → Network tab → use the AI assistant → look for `leaves.mintlify.com/api/assistant/{project-id}/message`
+```bash
+docmole install --skills --force              # overwrite a customized skill
+docmole install --skills --target ~           # install globally (applies to every project)
+```
 
-## Configuration
+### list
+Shows every project with its source URL (redacted), index status, and page count.
 
-| Environment Variable | Default | Description |
-|---------------------|---------|-------------|
-| `OPENAI_API_KEY` | — | Required for local RAG mode |
-| `DOCMOLE_DATA_DIR` | `~/.docmole` | Data directory for projects |
-
-### Project structure
+## Data layout
 
 ```
 ~/.docmole/
-├── projects/
-│   └── <project-id>/
-│       ├── config.yaml      # Project configuration
-│       └── lancedb/         # Vector database
-└── global.yaml              # Global settings
+└── projects/<id>/
+    ├── config.yaml          # source url, indexed status, page count
+    ├── pages/               # markdown mirror — URL path = file path
+    │   └── sessions/persisting-sessions/overview.md
+    └── search-index.json    # BM25 inverted index (rebuilt by setup)
 ```
 
-## Documentation
+Each `.md` page opens with:
 
-See [AGENT.md](./AGENT.md) for detailed documentation including:
-- Architecture details
-- Backend implementations
-- Enterprise deployment guides
+```yaml
+---
+source_url: https://docs.agno.com/sessions/persisting-sessions/overview
+fetched_at: 2026-04-17T22:30:00.000Z
+title: Persisting Sessions
+---
+```
+
+## The skill pattern
+
+docmole's SKILL.md teaches the agent a 3-step discipline:
+
+| Step | Why it matters |
+|---|---|
+| **Rewrite the user's question into keywords** | BM25 is lexical. `"how do I keep data between runs"` → `"persist session storage database"`. |
+| **Batch `head -80` across the top 2 results in one tool call** | Reads are ~40× cheaper than `cat`; parallel batch beats sequential. |
+| **Only `cat` if `head` didn't answer** | Don't inflate context with whole files when the prefix usually suffices. |
+
+The SKILL.md frontmatter pre-authorizes `Bash(docmole:*) Bash(head:*) Bash(cat:*) Bash(rg:*)` so Claude Code doesn't prompt for permission on the hot path.
+
+## Team sharing (today + planned)
+
+Team members already get identical results via `rsync` / `git` / S3 sync of a `projects/<id>/` directory. Source URLs and crawl creds never leave the machine that crawled — only the `pages/` output travels.
+
+Later: `docmole publish` / `docmole pull` for bundles, and a central daemon with RBAC for enterprise. Not built yet.
 
 ## Contributing
 
-PRs welcome! See the [contributing guide](./CONTRIBUTING.md) for details.
+```bash
+git clone https://github.com/Vigtu/docmole.git && cd docmole
+bun install          # uses Bun for dev speed (Node for publish)
+bun run test         # runs test suite
+bun run typecheck    # tsc --noEmit
+bun run lint         # biome check --write
+bun run build        # builds dist/cli.js (Node target)
+```
+
+Runtime is Node 18+ via `dist/cli.js`. Development uses Bun for fast TS execution and the built-in test runner. The build step decouples the two.
 
 ## Acknowledgments
 
-- [Mintlify](https://mintlify.com) for amazing documentation tooling
-- [Anthropic](https://anthropic.com) for Claude and the MCP protocol
-- [LanceDB](https://lancedb.com) for the vector database
+- [`@playwright/cli`](https://github.com/microsoft/playwright-cli) — CLI + skills pattern inspiration
+- [Mintlify](https://mintlify.com) — observed their `docs as filesystem + bash tool` pivot on `docs.agno.com`; the skill pattern is reverse-engineered from their actual agent behavior
 
 ## License
 
-The Docmole codebase is under [MIT license](./LICENSE).
+MIT — see [LICENSE](./LICENSE).
