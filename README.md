@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/vigtu-docmole-badge.png)](https://mseep.ai/app/vigtu-docmole)
+
 <p align="center">
   <a href="https://github.com/Vigtu/docmole">
     <img loading="lazy" alt="docmole" src="https://raw.githubusercontent.com/Vigtu/docmole/main/assets/docmole-hero.svg" width="100%"/>
